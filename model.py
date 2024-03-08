@@ -2,12 +2,12 @@ import json
 import random
 import os
 import trisNoGUI #a me da errore di importazione ma chiama comunque le funzioni, boh ~Cristian
-                 #comunque doveva servire da versione NOGUI ma alla fine richiama solo qualche funzione che potrei passare a questo file
+from threading import Thread, Lock   #comunque doveva servire da versione NOGUI ma alla fine richiama solo qualche funzione che potrei passare a questo file
 
 Q_tableX = {}  # Chiave: stato (tupla (dict, azione)), valore)
 Q_tableO = {} 
-alpha = 0.5 #valori per l'allenamento del modello, globali perché almeno non va né passato né ritornato nelle funzioni
-gamma = 0.9
+alpha = 0.60 #valori per l'allenamento del modello, globali perché almeno non va né passato né ritornato nelle funzioni
+gamma = 0.90
 if os.path.exists('qtablex.text'):
     with open('qtablex.txt', 'r') as file:
         input_string = file.readline()
@@ -30,9 +30,6 @@ if os.path.exists('qtableo.text'):
         Q_tableO[eval(dict_string)] = float(float_string)
 else:
     Q_tableO = {}
-
-j = 0
-
 
 def azioni_disponibili_da_stringa(gameboard_str):
     """
@@ -66,13 +63,16 @@ def esegui_mossa(gameboard, posizione, simbolo):
 
     return gameboard
 
-def scegli_azione(stato, azioni_disponibili, Q_table, epsilon=0.1):
-    if random.random() < epsilon:  # Esplorazione
+def scegli_azione(stato, azioni_disponibili, Q_table, epsilon):
+    if random.random() < 0.2 - epsilon:  # Esplorazione
         return random.choice(azioni_disponibili)
     else:  # Sfruttamento
         q_values = Q_table.get(stato, {})
         if q_values:  # Se ci sono valori Q noti per questo stato
-            return max(q_values, key=q_values.get)  # Scegli la mossa con il massimo valore Q
+            if(max(q_values, key=q_values.get) < 0):
+                return random.choice(azioni_disponibili)
+            else:
+                return max(q_values, key=q_values.get)  # Scegli la mossa con il massimo valore Q
         return random.choice(azioni_disponibili)  # Caso in cui non ci sono mosse conosciute
 
 def aggiorna_q_table(stato, azione, ricompensa, stato_successivo, azioni_disponibili, alpha, gamma, Q_table):
@@ -82,87 +82,118 @@ def aggiorna_q_table(stato, azione, ricompensa, stato_successivo, azioni_disponi
     q_target = ricompensa + gamma * q_massimo_futuro  # Calcola il target Q
     Q_table[(stato, azione)] = q_attuale + alpha * (q_target - q_attuale)  # Aggiorna il valore Q nella tabella
     #alpha += 0.05
-    
+
 def allenamento(num_partite):
     #TODO creare una funzione che calcoli effettivamente la ricompensa per scelte intelligenti come il continuo di una streak o interrompere quella di un altro
+    global Q_tableX
+    global Q_tableO
+    j = 0
     for _ in range(num_partite):
+        os.system('cls')
         gameboard = trisNoGUI.Reset()  # Resetta il tabellone, e il contatore dei turni
         lastPlayed = random.randint(0, 1)
-        global alpha 
-        alpha = 0.6
-        global gamma 
-        gamma = 1
         fine_partita = False
         stato_corrente = gameboard
         ricompensa = 0
+        azioneX = ''
+        azioneO = ''
+        j = 0
         while not fine_partita:
-                azioni_disponibili = azioni_disponibili_da_stringa(str(stato_corrente))
-                currState = str(stato_corrente)
-                if(lastPlayed == 0):
-                    azione = scegli_azione(str(stato_corrente), azioni_disponibili, Q_tableX)
-                    nuovo_stato = esegui_mossa(stato_corrente, azione, 'X')
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
+            azioni_disponibili = azioni_disponibili_da_stringa(str(stato_corrente))
+            currState = str(stato_corrente)
+            if(lastPlayed == 0):
+                azioneX = scegli_azione(str(stato_corrente), azioni_disponibili, Q_tableX, j/50)
+                nuovo_stato = esegui_mossa(stato_corrente, azioneX, 'X')
+            else:
+                azioneO = scegli_azione(str(stato_corrente), azioni_disponibili, Q_tableO, j/50)
+                nuovo_stato = esegui_mossa(stato_corrente, azioneO, 'O')
+            fine_partita = trisNoGUI.CheckVittoria(nuovo_stato)
+            #print(f"Azioni disponibili: {azioni_disponibili_da_stringa(str(nuovo_stato))}\n") 
+            if (fine_partita):
+                ricompensa = 19 - j
+                if(lastPlayed == 1):
+                    aggiorna_q_table(statoPrecedente, azionePrecedenteX, -(10 + (10 - j/2)), str(currState), azioni_disponibiliPrecedenti, alpha, gamma, Q_tableX)
+                    aggiorna_q_table(currState, azioneO, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
                 else:
-                    azione = scegli_azione(str(stato_corrente), azioni_disponibili, Q_tableO)
-                    nuovo_stato = esegui_mossa(stato_corrente, azione, 'O')
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
-                trisNoGUI.StampaMatrice(nuovo_stato)
-                fine_partita = trisNoGUI.CheckVittoria(nuovo_stato)
-                print(f"Azioni disponibili: {azioni_disponibili_da_stringa(str(nuovo_stato))}") 
-                if (fine_partita):
-                    ricompensa = 100
-                    if(lastPlayed == 1):
-                        aggiorna_q_table(currState, azione, -2, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
-                        aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
-                    else:
-                        aggiorna_q_table(currState, azione, -2, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
-                        aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
+                    aggiorna_q_table(statoPrecedente, azionePrecedenteO, -(10 + (10 - j/2)), str(currState), azioni_disponibiliPrecedenti, alpha, gamma, Q_tableO)
+                    aggiorna_q_table(currState, azioneX, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
+            else:
+                ricompensa = 0.01 + j/100
+                if(lastPlayed == 1):
+                    aggiorna_q_table(currState, azioneO, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
                 else:
-                    ricompensa = 0.1
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
-                if None not in nuovo_stato.values() and not fine_partita:
-                    print("Pareggio")
-                    ricompensa = 1
-                    fine_partita = True
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
-                    aggiorna_q_table(currState, azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
-                stato_corrente = nuovo_stato
-                if fine_partita:
-                    break
-                if(lastPlayed == 0):
-                    lastPlayed = 1
+                    aggiorna_q_table(currState, azioneX, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
+            if None not in nuovo_stato.values() and not fine_partita:
+                print("Pareggio")
+                ricompensa = 2
+                if(lastPlayed == 1):
+                    aggiorna_q_table(currState, azioneO, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableO)
+                    aggiorna_q_table(statoPrecedente, azionePrecedenteX, ricompensa, str(currState), azioni_disponibiliPrecedenti, alpha, gamma, Q_tableX)
                 else:
-                    lastPlayed = 0
-        print(f"Partite mancanti: {100000 - _}")
-            
-    #            for giocatore in ['X', 'O']:
-    #            azioni_disponibili = azioni_disponibili_da_stringa(str(stato_corrente))
-    #            azione = scegli_azione(str(stato_corrente), azioni_disponibili)
-    #            nuovo_stato = esegui_mossa(stato_corrente, azione, giocatore)   #un sacco di variabili inutili ma almeno è leggibile
-    #            trisNoGUI.StampaMatrice(nuovo_stato)
-    #            fine_partita = trisNoGUI.CheckVittoria(nuovo_stato)
-    #            print(f"Azioni disponibili: {azioni_disponibili_da_stringa(str(nuovo_stato))}") #creo una nuova variabile perché se no dovrei sovrascrivere azioni disponibili
-    #            ricompensa = 0                                                                  #e non si può altrimenti ciao ciao aggiornamento della Qtable
-    #            if (fine_partita):
-    #                ricompensa += 1 - j
-    #            else:
-    #                ricompensa += 1
-    #            if None not in nuovo_stato.values():
-    #                print("Pareggio")
-    #                ricompensa /= 2
-    #                fine_partita = True
-    #            aggiorna_q_table(str(stato_corrente), azione, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma )
-    #            stato_corrente = nuovo_stato
-    #            if fine_partita:
-    #                break
-                    
-'''
-allenamento(100000)
-with open('qtablex.txt', 'w') as file:
-    for key, value in Q_tableX.items():
-        file.write(f'{key}:{value}\n')
-with open('qtableo.txt', 'w') as file:
-    for key, value in Q_tableO.items():
-        file.write(f'{key}:{value}\n')
-'''
+                    aggiorna_q_table(currState, azioneX, ricompensa, str(nuovo_stato), azioni_disponibili, alpha, gamma, Q_tableX)
+                    aggiorna_q_table(statoPrecedente, azionePrecedenteO, ricompensa, str(currState), azioni_disponibiliPrecedenti, alpha, gamma, Q_tableO)
+                fine_partita = True
+            stato_corrente = nuovo_stato
+            azionePrecedenteX = azioneX
+            azionePrecedenteO = azioneO
+            statoPrecedente = currState
+            azioni_disponibiliPrecedenti = azioni_disponibili
+            if(lastPlayed == 0):
+                lastPlayed = 1
+            else:
+                lastPlayed = 0
+            j += 1
+        print(f"Partite mancanti: {1000000 - _}")
+    blocco.acquire()
+    tableXcopy = Q_tableX.copy()
+    tableOcopy = Q_tableO.copy()
+    with open('qtablex.txt', 'w') as file:
+        for key, value in tableXcopy.items():
+            file.write(f'{key}:{value}\n')
+    with open('qtableo.txt', 'w') as file:
+        for key, value in tableOcopy.items():
+            file.write(f'{key}:{value}\n')
+    blocco.release()
+
+blocco = Lock()
+
+class Train (Thread):
+    def __init__(self, nome):
+        Thread.__init__(self)
+        self.nome = nome
+    def run(self):
+        allenamento(1000000)
+
+
+thread1 = Train("Thread1")
+thread2 = Train("Thread2")
+thread3 = Train("Thread3")
+thread4 = Train("Thread4")
+thread5 = Train("Thread5")
+thread6 = Train("Thread6")
+thread7 = Train("Thread7")
+thread8 = Train("Thread8")
+thread9 = Train("Thread9")
+thread0 = Train("Thread0")
+
+thread1.start()
+thread2.start()
+thread3.start()
+thread4.start()
+thread5.start()
+thread6.start()
+thread7.start()
+thread8.start()
+thread9.start()
+thread0.start()
+
+thread1.join()
+thread2.join()
+thread3.join()
+thread4.join()
+thread5.join()
+thread6.join()
+thread7.join()
+thread8.join()
+thread9.join()
+thread0.join()
