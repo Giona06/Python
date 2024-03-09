@@ -91,7 +91,7 @@ def allenamento(num_partite):
     for _ in range(num_partite):
         os.system('cls')
         gameboard = trisNoGUI.Reset()  # Resetta il tabellone, e il contatore dei turni
-        lastPlayed = random.randint(0, 1)
+        lastPlayed = random.randint(0, 1) #Sceglie a caso quale giocatore comincia
         fine_partita = False
         stato_corrente = gameboard
         ricompensa = 0
