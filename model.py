@@ -69,7 +69,7 @@ def scegli_azione(stato, azioni_disponibili, Q_table, epsilon):
     else:  # Sfruttamento
         q_values = Q_table.get(stato, {})
         if q_values:  # Se ci sono valori Q noti per questo stato
-            if(max(q_values, key=q_values.get) < 0): #Se il valore di Q è negativo ne prende uno a caso
+            if(max(q_values, key=q_values.get) < 0): #Se il valore di Q più alto attualmente è negativo ne prende uno a caso
                 return random.choice(azioni_disponibili)
             else:
                 return max(q_values, key=q_values.get)  # Scegli la mossa con il massimo valore Q
@@ -78,7 +78,7 @@ def scegli_azione(stato, azioni_disponibili, Q_table, epsilon):
 def aggiorna_q_table(stato, azione, ricompensa, stato_successivo, azioni_disponibili, alpha, gamma, Q_table):
     
     q_attuale = Q_table.get((stato, azione), 0)  # Ottiene il valore Q corrente, 0 se non esistente
-    q_massimo_futuro = max(Q_table.get((stato_successivo, a), 0.1) for a in azioni_disponibili)
+    q_massimo_futuro = max(Q_table.get((stato_successivo, a), 0.1) for a in azioni_disponibili) #TODO probabilmente il valore q negativo causa problemi nel calcolo del q futuro
     q_target = ricompensa + gamma * q_massimo_futuro  # Calcola il target Q
     Q_table[(stato, azione)] = q_attuale + alpha * (q_target - q_attuale)  # Aggiorna il valore Q nella tabella
     #alpha += 0.05
@@ -143,7 +143,7 @@ def allenamento(num_partite):
             else:
                 lastPlayed = 0
             j += 1
-        print(f"Partite mancanti: {1000000 - _}")
+        print(f"Partite mancanti: {num_partite - _}")
     blocco.acquire()
     tableXcopy = Q_tableX.copy()
     tableOcopy = Q_tableO.copy()
@@ -162,7 +162,8 @@ class Train (Thread):
         Thread.__init__(self)
         self.nome = nome
     def run(self):
-        allenamento(1000000)
+        allenamento(50000
+                    )
 
 
 thread1 = Train("Thread1")
