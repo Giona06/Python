@@ -69,7 +69,7 @@ def scegli_azione(stato, azioni_disponibili, Q_table, epsilon):
     else:  # Sfruttamento
         q_values = Q_table.get(stato, {})
         if q_values:  # Se ci sono valori Q noti per questo stato
-            if(max(q_values, key=q_values.get) < 0):
+            if(max(q_values, key=q_values.get) < 0): #Se il valore di Q è negativo ne prende uno a caso
                 return random.choice(azioni_disponibili)
             else:
                 return max(q_values, key=q_values.get)  # Scegli la mossa con il massimo valore Q
